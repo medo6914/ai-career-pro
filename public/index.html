@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Career Pro - أدوات الذكاء الاصطناعي للمسار المهني</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+
+  <header>
+    <div class="container header-inner">
+      <div class="logo">AI Career <span>Pro</span></div>
+      <nav>
+        <a href="#tools" data-i18n="tools">الأدوات</a>
+        <a href="#pricing" data-i18n="pricing">الباقات</a>
+        <button id="langToggle" class="lang-btn">EN</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <h1 data-i18n="hero_title">الذكاء الاصطناعي يكتب لك خطاب التقديم وعرض السعر في ثواني</h1>
+      <p class="hero-sub" data-i18n="hero_sub">ادعم الدفع بـ Vodafone Cash وEtisalat Cash وجميع البنوك المصرية والعربية</p>
+      <div class="hero-cta">
+        <a href="#tools" class="btn btn-primary" data-i18n="start_free">ابدأ مجاناً</a>
+        <a href="#pricing" class="btn btn-outline" data-i18n="see_pricing">عرض الباقات</a>
+      </div>
+      <div class="usage-badge" data-i18n="free_limit">5 استخدامات مجانية | جميع البنوك</div>
+    </div>
+  </section>
+
+  <!-- Usage -->
+  <section class="usage-section">
+    <div class="container">
+      <div class="usage-card">
+        <div class="usage-info">
+          <span data-i18n="usage_remaining">الاستخدامات المتبقية:</span>
+          <strong id="usageCount">5 / 5</strong>
+          <span id="tierBadge" class="tier-badge free">مجاني</span>
+        </div>
+        <div class="usage-bar"><div id="usageBar" class="usage-fill" style="width:100%"></div></div>
+        <p class="usage-note" data-i18n="usage_note">اشترك للاستخدام غير المحدود</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tools -->
+  <section id="tools" class="tools">
+    <div class="container">
+      <h2 class="section-title" data-i18n="tools_title">اختر أداتك</h2>
+      <h3 class="category-title" data-i18n="seeker_tools">🧑‍💼 للباحثين عن عمل</h3>
+      <div class="tools-grid">
+        <button class="tool-card" data-tool="cover-letter"><div class="tool-icon">📄</div><div class="tool-name" data-i18n="cover_letter">خطاب التقديم</div><div class="tool-desc" data-i18n="cover_letter_desc">خطاب احترافي لأي شركة</div></button>
+        <button class="tool-card" data-tool="cv-optimizer"><div class="tool-icon">📋</div><div class="tool-name" data-i18n="cv_optimizer">تحسين السيرة الذاتية</div><div class="tool-desc" data-i18n="cv_optimizer_desc">تعديل سيرتك للوظيفة</div></button>
+        <button class="tool-card" data-tool="linkedin-message"><div class="tool-icon">💼</div><div class="tool-name" data-i18n="linkedin_msg">رسائل لينكد إن</div><div class="tool-desc" data-i18n="linkedin_msg_desc">تواصل مع مسؤولي التوظيف</div></button>
+      </div>
+      <h3 class="category-title" style="margin-top:40px" data-i18n="freelancer_tools">✍️ للفريلانسرز</h3>
+      <div class="tools-grid">
+        <button class="tool-card" data-tool="proposal"><div class="tool-icon">📝</div><div class="tool-name" data-i18n="proposal">عرض السعر</div><div class="tool-desc" data-i18n="proposal_desc">عرض مقنع يفوز بالمشاريع</div></button>
+        <button class="tool-card" data-tool="client-message"><div class="tool-icon">💬</div><div class="tool-name" data-i18n="client_msg">رسائل العملاء</div><div class="tool-desc" data-i18n="client_msg_desc">تواصل احترافي</div></button>
+        <button class="tool-card" data-tool="content-writer"><div class="tool-icon">✍️</div><div class="tool-name" data-i18n="content_writer">كتابة المحتوى</div><div class="tool-desc" data-i18n="content_writer_desc">محتوى تسويقي</div></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Form -->
+  <section id="formSection" class="form-section" style="display:none">
+    <div class="container">
+      <div class="form-card">
+        <div class="form-header"><h3 id="formTitle" data-i18n="fill_details">أدخل التفاصيل</h3><button id="closeForm" class="close-btn">✕</button></div>
+        <form id="aiForm">
+          <div class="form-group"><label for="name" data-i18n="label_name">الاسم الكامل</label><input type="text" id="name" required placeholder="محمد أحمد"></div>
+          <div class="form-group"><label for="jobTitle" data-i18n="label_job">المسمى الوظيفي</label><input type="text" id="jobTitle" placeholder="مهندس برمجيات"></div>
+          <div class="form-group"><label for="company" data-i18n="label_company">الشركة</label><input type="text" id="company" placeholder="Aramco, مستقل"></div>
+          <div class="form-group"><label for="skills" data-i18n="label_skills">المهارات</label><input type="text" id="skills" placeholder="JavaScript, تسويق"></div>
+          <div class="form-group"><label for="experience" data-i18n="label_exp">الخبرة</label><input type="text" id="experience" placeholder="3 سنوات"></div>
+          <div class="form-group"><label for="details" data-i18n="label_details">تفاصيل</label><textarea id="details" rows="4"></textarea></div>
+
+          <!-- AI Provider (VIP only) -->
+          <div id="aiProviderSection" class="ai-provider-section" style="display:none">
+            <label data-i18n="choose_ai">اختر مزود AI:</label>
+            <div class="ai-provider-options" id="aiProviderOptions">
+              <button class="ai-provider-opt active" data-provider="openrouter" data-i18n="ai_openrouter">🌐 OpenRouter</button>
+              <button class="ai-provider-opt" data-provider="gemini" data-i18n="ai_gemini">✨ Gemini</button>
+              <button class="ai-provider-opt" data-provider="openai" data-i18n="ai_chatgpt">🤖 ChatGPT</button>
+            </div>
+            <div class="vip-lock-msg" data-i18n="vip_feature">🌟 ميزة VIP</div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" id="generateBtn"><span data-i18n="generate">🪄 توليد المحتوى</span></button>
+          <div id="loadingIndicator" style="display:none" class="loading"><div class="spinner"></div><span data-i18n="generating">جارٍ التوليد...</span></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- Result -->
+  <section id="resultSection" class="result-section" style="display:none">
+    <div class="container">
+      <div class="result-card">
+        <div class="result-header"><h3 data-i18n="result">النتيجة</h3><button id="copyBtn" class="btn btn-sm" data-i18n="copy">📋 نسخ</button></div>
+        <div id="resultContent" class="result-content"></div>
+        <div class="result-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="generateAnother" class="btn btn-primary" data-i18n="another" style="flex:1">توليد آخر</button>
+          <button id="downloadPdfBtn" class="btn btn-outline" style="flex:1">📄 PDF</button>
+          <button id="downloadImgBtn" class="btn btn-outline" style="flex:1">🖼️ صورة</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="pricing">
+    <div class="container">
+      <h2 class="section-title" data-i18n="pricing_title">اختر باقتك</h2>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h3 data-i18n="free">مجاني</h3>
+          <div class="price">$0</div>
+          <ul>
+            <li data-i18n="free_feat1">✓ 5 استخدامات مجانية</li>
+            <li data-i18n="free_feat2">✓ جميع الأدوات</li>
+            <li data-i18n="free_feat3">✗ استخدام غير محدود</li>
+            <li data-i18n="free_feat4">✗ اختيار مزود AI</li>
+          </ul>
+          <button class="btn btn-outline btn-full" onclick="document.getElementById('tools').scrollIntoView({behavior:'smooth'})" data-i18n="current_plan">الخطة الحالية</button>
+        </div>
+
+        <div class="pricing-card featured">
+          <div class="badge" data-i18n="popular">الأكثر طلباً</div>
+          <h3 data-i18n="pro">احترافية</h3>
+          <div class="price">$9.99<span data-i18n="month">/شهر</span></div>
+          <ul>
+            <li data-i18n="pro_feat1">✓ استخدام غير محدود</li>
+            <li data-i18n="pro_feat2">✓ جميع الأدوات</li>
+            <li data-i18n="pro_feat3">✓ دفع محلي (Vodafone Cash, Etisalat Cash)</li>
+            <li data-i18n="pro_feat4">✓ دعم فني</li>
+          </ul>
+          <div class="pay-methods-group">
+            <button class="pay-method-btn active" data-method="stripe">💳 فيزا/ماستركارد</button>
+            <button class="pay-method-btn" data-method="paypal">🅿️ PayPal</button>
+            <button class="pay-method-btn" data-method="vodafone_cash">📱 Vodafone Cash</button>
+            <button class="pay-method-btn" data-method="etisalat_cash">📱 Etisalat Cash</button>
+          </div>
+          <button class="btn btn-primary btn-full subscribe-btn" data-tier="pro" data-i18n="subscribe">اشترك الآن</button>
+        </div>
+
+        <div class="pricing-card gold">
+          <div class="badge gold-badge" data-i18n="vip_badge">🌟 VIP</div>
+          <h3 data-i18n="vip">VIP</h3>
+          <div class="price">$19.99<span data-i18n="month">/شهر</span></div>
+          <ul>
+            <li data-i18n="vip_feat1">✓ كل شيء في الاحترافية</li>
+            <li data-i18n="vip_feat2">✓ اختيار مزود AI (Gemini, ChatGPT, OpenRouter)</li>
+            <li data-i18n="vip_feat3">✓ نماذج أقوى</li>
+            <li data-i18n="vip_feat4">✓ دعم فني أولوية</li>
+          </ul>
+          <div class="pay-methods-group">
+            <button class="pay-method-btn active" data-method="stripe">💳 فيزا/ماستركارد</button>
+            <button class="pay-method-btn" data-method="paypal">🅿️ PayPal</button>
+            <button class="pay-method-btn" data-method="vodafone_cash">📱 Vodafone Cash</button>
+            <button class="pay-method-btn" data-method="etisalat_cash">📱 Etisalat Cash</button>
+          </div>
+          <button class="btn btn-primary btn-full subscribe-btn" data-tier="vip" data-i18n="subscribe_vip">اشترك VIP الآن</button>
+        </div>
+
+        <div class="pricing-card">
+          <h3 data-i18n="enterprise">مؤسسات</h3>
+          <div class="price">$29.99<span data-i18n="month">/شهر</span></div>
+          <ul>
+            <li data-i18n="ent_feat1">✓ كل شيء في VIP</li>
+            <li data-i18n="ent_feat2">✓ 5 مستخدمين</li>
+            <li data-i18n="ent_feat3">✓ API مخصص</li>
+            <li data-i18n="ent_feat4">✓ تقارير استخدام</li>
+          </ul>
+          <button class="btn btn-outline btn-full" onclick="window.location.href='mailto:enterprise@aicareerpro.com'" data-i18n="contact_us">تواصل معنا</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Payment Methods Info -->
+  <section class="payment-info">
+    <div class="container">
+      <h3 data-i18n="payment_methods">طرق الدفع المتاحة</h3>
+      <div class="payment-icons">
+        <span class="payment-icon">💳 فيزا</span>
+        <span class="payment-icon">💳 ماستركارد</span>
+        <span class="payment-icon">🇸🇦 Mada (مدى)</span>
+        <span class="payment-icon">🇪🇬 Vodafone Cash</span>
+        <span class="payment-icon">🇪🇬 Etisalat Cash</span>
+        <span class="payment-icon">🍏 Apple Pay</span>
+        <span class="payment-icon">🅿️ PayPal</span>
+      </div>
+      <p class="usage-note" style="text-align:center;margin-top:12px" data-i18n="payment_note">جميع المدفوعات مشفرة وآمنة عبر Stripe - Paymob - PayPal</p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="container">
+      <h2 class="section-title" data-i18n="why_us">لماذا AI Career Pro؟</h2>
+      <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon">🇸🇦🇪🇬</div><h3 data-i18n="gulf_focused">مخصص للعالم العربي</h3><p data-i18n="gulf_focused_desc">يفهم سوق العمل في الخليج ومصر والوطن العربي</p></div>
+        <div class="feature-card"><div class="feature-icon">🌐</div><h3 data-i18n="bilingual">عربي + إنجليزي</h3><p data-i18n="bilingual_desc">توليد المحتوى باللغتين</p></div>
+        <div class="feature-card"><div class="feature-icon">⚡</div><h3 data-i18n="fast">في ثواني</h3><p data-i18n="fast_desc">ما كان يأخذ ساعات ينجز في ثوان</p></div>
+        <div class="feature-card"><div class="feature-icon">✨🤖🌐</div><h3 data-i18n="multi_ai">اختيار مزود AI</h3><p data-i18n="multi_ai_desc">VIP يختارون Gemini, ChatGPT أو OpenRouter</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>© 2026 AI Career Pro — <span data-i18n="footer_tagline">ذكاء اصطناعي لمستقبل مهني أفضل</span></p>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
