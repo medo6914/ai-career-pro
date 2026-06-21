@@ -1,4 +1,7 @@
-node_modules
 .env
-dist
-build
+*.log
+node_modules/
+*.ps1
+test-*.js
+create_*.js
+setup_*.js
