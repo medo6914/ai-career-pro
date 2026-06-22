@@ -340,9 +340,11 @@ async function handleWallet(tier, method) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    if (data.pending) {
+    if (data.redirect && data.url) {
+      // Paymob iframe بيدعم OTP للمحافظ — يحول المستخدم لصفحة الدفع
+      window.location.href = data.url;
+    } else if (data.pending) {
       alert(i18n[currentLang]['wallet_sent']);
-      // Poll for completion
       let att = 0;
       const check = setInterval(async () => {
         att++;
