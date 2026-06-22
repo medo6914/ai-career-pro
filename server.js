@@ -50,8 +50,8 @@ const CONFIG = {
     secretKey: cleanKey(process.env.STRIPE_SECRET_KEY),
     publishableKey: cleanKey(process.env.STRIPE_PUBLISHABLE_KEY),
     webhookSecret: cleanKey(process.env.STRIPE_WEBHOOK_SECRET),
-    proPriceId: cleanKey(process.env.STRIPE_PRO_PRICE_ID),
-    vipPriceId: cleanKey(process.env.STRIPE_VIP_PRICE_ID)
+    proPriceId: cleanKey(process.env.STRIPE_PRO_MONTHLY_PRICE_ID),
+    vipPriceId: cleanKey(process.env.STRIPE_VIP_MONTHLY_PRICE_ID)
   },
   paypal: {
     clientId: cleanKey(process.env.PAYPAL_CLIENT_ID),
