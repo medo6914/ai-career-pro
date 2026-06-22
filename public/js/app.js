@@ -317,9 +317,8 @@ async function handlePayPal(tier) {
     const order = await orderRes.json();
     if (!orderRes.ok) throw new Error(order.error);
     if (order.id) {
-      const baseUrl = window.location.hostname === 'localhost'
-        ? 'https://www.sandbox.paypal.com' : 'https://www.paypal.com';
-      window.open(`${baseUrl}/checkoutnow?token=${order.id}`, '_blank');
+      const url = order.approvalUrl || `https://www.sandbox.paypal.com/checkoutnow?token=${order.id}`;
+      window.open(url, '_blank');
       alert('✅ فتح PayPal. أكمل الدفع في النافذة الجديدة.');
       let attempts = 0;
       const checkStatus = setInterval(async () => {

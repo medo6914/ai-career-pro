@@ -277,7 +277,10 @@ app.post('/api/create-paypal-order', async (req, res) => {
     });
     const order = await orderRes.json();
     if (!orderRes.ok) throw new Error(order.message || 'PayPal error');
-    res.json({ success: true, id: order.id, status: order.status });
+    const approveLink = order.links?.find(l => l.rel === 'payer-action')?.href
+      || order.links?.find(l => l.rel === 'approve')?.href
+      || `${PAYPAL_API.replace('api-m','www')}/checkoutnow?token=${order.id}`;
+    res.json({ success: true, id: order.id, status: order.status, approvalUrl: approveLink });
   } catch (error) {
     console.error('❌ PayPal Order Error:', error.message);
     res.status(500).json({ success: false, provider: 'paypal', message: error.message });
