@@ -318,25 +318,7 @@ async function handlePayPal(tier) {
     if (!orderRes.ok) throw new Error(order.error);
     if (order.id) {
       const url = order.approvalUrl || `https://www.sandbox.paypal.com/checkoutnow?token=${order.id}`;
-      window.open(url, '_blank');
-      alert('✅ فتح PayPal. أكمل الدفع في النافذة الجديدة.');
-      let attempts = 0;
-      const checkStatus = setInterval(async () => {
-        attempts++;
-        if (attempts > 20) { clearInterval(checkStatus); return; }
-        try {
-          const capRes = await fetch('/api/capture-paypal-order', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderId: order.id, clientId, tier })
-          });
-          const capture = await capRes.json();
-          if (capture.status === 'COMPLETED') {
-            clearInterval(checkStatus);
-            alert('✅ تم الترقية بنجاح!');
-            location.reload();
-          }
-        } catch (e) {}
-      }, 3000);
+      window.location.href = url;
     }
   } catch (err) {
     alert(err.message || 'PayPal error.');

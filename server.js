@@ -267,12 +267,19 @@ app.post('/api/create-paypal-order', async (req, res) => {
     if (!amount) return res.status(400).json({ success: false, message: 'Invalid tier' });
 
     const token = await getPayPalToken();
+    const origin = req.headers.origin || 'https://ai-career-pro-production.up.railway.app';
     const orderRes = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         intent: 'CAPTURE',
-        purchase_units: [{ amount: { currency_code: 'USD', value: amount }, description: `AI Career Pro ${tier}`, custom_id: `${clientId || ''}:${tier}` }]
+        purchase_units: [{ amount: { currency_code: 'USD', value: amount }, description: `AI Career Pro ${tier}`, custom_id: `${clientId || ''}:${tier}` }],
+        application_context: {
+          return_url: `${origin}/api/paypal/return?tier=${tier}&clientId=${clientId || ''}`,
+          cancel_url: `${origin}/?canceled=true`,
+          user_action: 'PAY_NOW',
+          brand_name: 'AI Career Pro'
+        }
       })
     });
     const order = await orderRes.json();
@@ -284,6 +291,28 @@ app.post('/api/create-paypal-order', async (req, res) => {
   } catch (error) {
     console.error('❌ PayPal Order Error:', error.message);
     res.status(500).json({ success: false, provider: 'paypal', message: error.message });
+  }
+});
+
+// PayPal return handler (after user approves on PayPal)
+app.get('/api/paypal/return', async (req, res) => {
+  try {
+    const { token: orderId, tier, clientId, PayerID } = req.query;
+    if (!orderId) return res.redirect('/?canceled=true');
+    const capRes = await fetch(`${PAYPAL_API}/v2/checkout/orders/${orderId}/capture`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getPayPalToken()}` }
+    });
+    const capture = await capRes.json();
+    if (capture.status === 'COMPLETED') {
+      upgradeUser(clientId || req.ip, tier || 'pro');
+      res.redirect('/?success=true&provider=paypal');
+    } else {
+      res.redirect('/?canceled=true');
+    }
+  } catch (e) {
+    console.error('❌ PayPal return error:', e.message);
+    res.redirect('/?canceled=true');
   }
 });
 
