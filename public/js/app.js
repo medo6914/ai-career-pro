@@ -340,7 +340,27 @@ async function handleWallet(tier, method) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    if (data.redirect && data.url) {
+    if (data.otp_required && data.payment_token) {
+      // Paymob أرسل OTP — اطلب من المستخدم إدخال الرمز
+      const otp = prompt(data.message || 'أدخل رمز التأكيد المرسل إلى هاتفك:');
+      if (!otp || otp.length < 4) {
+        alert('الرمز غير صحيح');
+        return;
+      }
+      const confirmRes = await fetch('/api/paymob/confirm-otp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp, payment_token: data.payment_token, phone: data.phone, subtype: data.subtype, clientId, tier })
+      });
+      const confirmData = await confirmRes.json();
+      if (confirmData.success) {
+        alert(confirmData.message || '✅ تم الدفع والترقية بنجاح!');
+        location.reload();
+      } else if (confirmData.redirect && confirmData.url) {
+        window.location.href = confirmData.url;
+      } else {
+        alert(confirmData.message || '❌ فشل التأكيد. حاول مرة أخرى.');
+      }
+    } else if (data.redirect && data.url) {
       window.location.href = data.url;
     }
   } catch (err) {

@@ -411,7 +411,6 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
 
     if (isWallet) {
-      // Wallet flow: Paymob يرسل OTP للمستخدم — نحوله لصفحة إدخال الرمز
       const subtype = paymentMethod === 'vodafone_cash' ? 'VODAFONE_CASH' : 'ETISALAT_CASH';
       const phone = req.body.phone || '01000000000';
       const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
@@ -423,12 +422,22 @@ app.post('/api/create-paymob-intent', async (req, res) => {
         })
       });
       const walletData = await walletRes.json();
-      if (walletData.pending && walletData.redirect_url) {
-        res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
+      console.log('📨 Paymob wallet response:', JSON.stringify(walletData));
+
+      if (walletData.pending) {
+        if (walletData.redirect_url) {
+          res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
+        } else {
+          // Paymob أرسل OTP — نطلب من المستخدم إدخال الرمز
+          res.json({
+            success: true, method: paymentMethod, otp_required: true,
+            orderId: order.id, paymobId: walletData.id,
+            payment_token: paymentKey.token, phone, subtype,
+            message: 'تم إرسال رمز التأكيد إلى هاتفك. أدخل الرمز لإتمام الدفع.'
+          });
+        }
       } else {
-        // Fallback: iframe
-        const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${CONFIG.paymob.iframeId}?payment_token=${paymentKey.token}`;
-        res.json({ success: true, method: paymentMethod, redirect: true, url: iframeUrl, orderId: order.id });
+        throw new Error(JSON.stringify(walletData));
       }
     } else {
       // Card / other — iframe
@@ -485,6 +494,39 @@ app.post('/api/webhook/paymob', (req, res) => {
   } catch (e) {
     console.error('❌ Paymob webhook error:', e.message);
     res.status(400).send('Error');
+  }
+});
+
+// Paymob OTP confirmation — المستخدم أدخل الرمز ونرسله لـ Paymob
+app.post('/api/paymob/confirm-otp', async (req, res) => {
+  try {
+    const { otp, payment_token, phone, subtype, clientId, tier } = req.body;
+    if (!otp || !payment_token || !phone || !subtype) {
+      return res.status(400).json({ success: false, message: 'Missing OTP fields' });
+    }
+
+    const confirmRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: { identifier: phone, subtype, otp },
+        payment_token
+      })
+    });
+    const confirmData = await confirmRes.json();
+    console.log('📨 Paymob OTP confirm:', JSON.stringify(confirmData));
+
+    if (confirmData.success === true) {
+      upgradeUser(clientId || req.ip, tier || 'pro');
+      res.json({ success: true, message: '✅ تم تأكيد الدفع والترقية بنجاح!' });
+    } else if (confirmData.pending && confirmData.redirect_url) {
+      res.json({ success: true, method: 'wallet', redirect: true, url: confirmData.redirect_url });
+    } else {
+      res.json({ success: false, message: confirmData.data?.message || 'رمز التأكيد غير صحيح. حاول مرة أخرى.' });
+    }
+  } catch (error) {
+    console.error('❌ Paymob OTP Error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
