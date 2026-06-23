@@ -326,16 +326,21 @@ async function handlePayPal(tier) {
 }
 
 async function handleWallet(tier, method) {
+  const phone = prompt(i18n[currentLang]['enter_phone']);
+  if (!phone || phone.length < 10) {
+    alert(i18n[currentLang]['phone_required']);
+    return;
+  }
+
   try {
     const res = await fetch('/api/create-paymob-intent', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tier, clientId, paymentMethod: 'wallet' })
+      body: JSON.stringify({ tier, clientId, paymentMethod: method, phone })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
     if (data.redirect && data.url) {
-      // Paymob iframe — يدخل رقم محفظته, يستلم OTP, يؤكد الدفع
       window.location.href = data.url;
     }
   } catch (err) {

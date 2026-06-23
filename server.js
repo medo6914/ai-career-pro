@@ -406,10 +406,33 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     u.pendingOrderId = order.id;
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
 
-    // Paymob iframe يدعم جميع طرق الدفع (فيزا, Vodafone Cash, Etisalat Cash)
-    // ويعالج OTP تلقائياً — بعد الدفع, Paymob يرسل Webhook ونقوم بالترقية
-    const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${CONFIG.paymob.iframeId}?payment_token=${paymentKey.token}`;
-    res.json({ success: true, method: paymentMethod || 'card', redirect: true, url: iframeUrl, orderId: order.id });
+    // Paymob Wallet Flow (Vodafone Cash / Etisalat Cash)
+    // Paymob يرسل OTP للمستخدم ونحوله لصفحة إدخال الرمز
+    if (paymentMethod === 'vodafone_cash' || paymentMethod === 'etisalat_cash') {
+      const subtype = paymentMethod === 'vodafone_cash' ? 'VODAFONE_CASH' : 'ETISALAT_CASH';
+      const phone = req.body.phone || '01000000000';
+      const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: { identifier: phone, subtype },
+          payment_token: paymentKey.token
+        })
+      });
+      const walletData = await walletRes.json();
+      if (walletData.pending && walletData.redirect_url) {
+        // Paymob يعطي رابط لصفحة إدخال OTP
+        res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
+      } else {
+        // Fallback: iframe
+        const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${CONFIG.paymob.iframeId}?payment_token=${paymentKey.token}`;
+        res.json({ success: true, method: paymentMethod, redirect: true, url: iframeUrl, orderId: order.id });
+      }
+    } else {
+      // Card / other — iframe
+      const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${CONFIG.paymob.iframeId}?payment_token=${paymentKey.token}`;
+      res.json({ success: true, method: 'card', redirect: true, url: iframeUrl, orderId: order.id });
+    }
   } catch (error) {
     console.error('❌ Paymob Error:', error.message);
     res.status(500).json({ success: false, provider: 'paymob', message: error.message });
