@@ -61,6 +61,7 @@ const CONFIG = {
   paymob: {
     apiKey: cleanKey(process.env.PAYMOB_API_KEY),
     integrationId: cleanKey(process.env.PAYMOB_INTEGRATION_ID),
+    walletIntegrationId: cleanKey(process.env.PAYMOB_WALLET_INTEGRATION_ID),
     iframeId: cleanKey(process.env.PAYMOB_IFRAME_ID),
     hmac: cleanKey(process.env.PAYMOB_HMAC)
   },
@@ -386,16 +387,19 @@ app.post('/api/create-paymob-intent', async (req, res) => {
 
     const billingData = {
       apartment: '1', floor: '1', street: 'N/A', building: '1',
-      phone_number: '01000000000', city: 'Cairo', country: 'EG',
-      first_name: 'User', last_name: '.', email: 'user@example.com'
+      phone_number: req.body.phone || '01000000000', city: 'Cairo', country: 'EG',
+      first_name: req.body.name || 'User', last_name: '.', email: req.body.email || 'user@example.com'
     };
+
+    const isWallet = paymentMethod === 'vodafone_cash' || paymentMethod === 'etisalat_cash';
+    const intentId = isWallet ? CONFIG.paymob.walletIntegrationId : CONFIG.paymob.integrationId;
 
     const pkRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payment_keys`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         auth_token: token, amount_cents: amount, expiration: 3600, order_id: order.id,
-        billing_data: billingData, currency: 'EGP', integration_id: CONFIG.paymob.integrationId, lock_order_when_paid: 'true'
+        billing_data: billingData, currency: 'EGP', integration_id: intentId, lock_order_when_paid: 'true'
       })
     });
     const paymentKey = await pkRes.json();
@@ -406,9 +410,8 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     u.pendingOrderId = order.id;
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
 
-    // Paymob Wallet Flow (Vodafone Cash / Etisalat Cash)
-    // Paymob يرسل OTP للمستخدم ونحوله لصفحة إدخال الرمز
-    if (paymentMethod === 'vodafone_cash' || paymentMethod === 'etisalat_cash') {
+    if (isWallet) {
+      // Wallet flow: Paymob يرسل OTP للمستخدم — نحوله لصفحة إدخال الرمز
       const subtype = paymentMethod === 'vodafone_cash' ? 'VODAFONE_CASH' : 'ETISALAT_CASH';
       const phone = req.body.phone || '01000000000';
       const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
@@ -421,7 +424,6 @@ app.post('/api/create-paymob-intent', async (req, res) => {
       });
       const walletData = await walletRes.json();
       if (walletData.pending && walletData.redirect_url) {
-        // Paymob يعطي رابط لصفحة إدخال OTP
         res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
       } else {
         // Fallback: iframe
