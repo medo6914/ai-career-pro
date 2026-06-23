@@ -386,8 +386,8 @@ app.post('/api/create-paymob-intent', async (req, res) => {
 
     const billingData = {
       apartment: '1', floor: '1', street: 'N/A', building: '1',
-      phone_number: req.body.phone || '01000000000', city: 'Cairo', country: 'EG',
-      first_name: req.body.name || 'User', last_name: '.', email: req.body.email || 'user@example.com'
+      phone_number: '01000000000', city: 'Cairo', country: 'EG',
+      first_name: 'User', last_name: '.', email: 'user@example.com'
     };
 
     const pkRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payment_keys`, {

@@ -87,8 +87,8 @@ const i18n = {
     pay_with: 'ادفع بـ',
     phone_required: 'رقم الهاتف مطلوب للدفع عبر المحفظة',
     enter_phone: 'أدخل رقم هاتفك للدفع',
-    wallet_sent: '✅ تم إرسال طلب الدفع. أدخل كود التأكيد المرسل إلى هاتفك.',
-    wallet_error: '❌ فشل الدفع عبر المحفظة. تحقق من الرقم وحاول مرة أخرى.',
+    wallet_sent: '✅ تم إرسال طلب الدفع. سيتم توجيهك إلى صفحة Paymob الآمنة لإدخال رمز التفعيل المرسل إلى هاتفك.',
+    wallet_error: '❌ فشل الدفع عبر المحفظة. حاول مرة أخرى.',
   },
   en: {
     tools: 'Tools', pricing: 'Pricing',
@@ -178,7 +178,7 @@ const i18n = {
     pay_with: 'Pay with',
     phone_required: 'Phone number required for wallet payment',
     enter_phone: 'Enter your phone number',
-    wallet_sent: '✅ Payment request sent. Enter OTP from your phone.',
+    wallet_sent: '✅ Payment request sent. Redirecting to Paymob secure page for OTP confirmation.',
     wallet_error: '❌ Wallet payment failed. Check number and try again.',
   }
 };
@@ -326,42 +326,17 @@ async function handlePayPal(tier) {
 }
 
 async function handleWallet(tier, method) {
-  const phone = prompt(i18n[currentLang]['enter_phone']);
-  if (!phone || phone.length < 10) {
-    alert(i18n[currentLang]['phone_required']);
-    return;
-  }
-
   try {
     const res = await fetch('/api/create-paymob-intent', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tier, clientId, paymentMethod: 'wallet', phone })
+      body: JSON.stringify({ tier, clientId, paymentMethod: 'wallet' })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
     if (data.redirect && data.url) {
-      // Paymob iframe بيدعم OTP للمحافظ — يحول المستخدم لصفحة الدفع
+      // Paymob iframe — يدخل رقم محفظته, يستلم OTP, يؤكد الدفع
       window.location.href = data.url;
-    } else if (data.pending) {
-      alert(i18n[currentLang]['wallet_sent']);
-      let att = 0;
-      const check = setInterval(async () => {
-        att++;
-        if (att > 30) { clearInterval(check); return; }
-        try {
-          const u = await fetch('/api/usage', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clientId })
-          });
-          const usageData = await u.json();
-          if (usageData.tier !== 'free' && usageData.tier === tier) {
-            clearInterval(check);
-            alert('✅ تم الترقية بنجاح!');
-            location.reload();
-          }
-        } catch (e) {}
-      }, 3000);
     }
   } catch (err) {
     alert(i18n[currentLang]['wallet_error']);
