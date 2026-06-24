@@ -392,7 +392,9 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     };
 
     const isWallet = paymentMethod === 'vodafone_cash' || paymentMethod === 'etisalat_cash';
-    const intentId = isWallet ? CONFIG.paymob.walletIntegrationId : CONFIG.paymob.integrationId;
+    const intentId = isWallet && CONFIG.paymob.walletIntegrationId
+      ? CONFIG.paymob.walletIntegrationId
+      : CONFIG.paymob.integrationId;
 
     const pkRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payment_keys`, {
       method: 'POST',
