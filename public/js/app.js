@@ -338,7 +338,7 @@ async function handleWallet(tier, method) {
       body: JSON.stringify({ tier, clientId, paymentMethod: method, phone })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if (!res.ok) throw new Error(data.message || data.error || 'فشل الاتصال');
 
     if (data.otp_required && data.payment_token) {
       // Paymob أرسل OTP — اطلب من المستخدم إدخال الرمز

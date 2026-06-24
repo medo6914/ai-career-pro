@@ -415,7 +415,12 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
 
     if (isWallet) {
-      // Paymob subtypes: VODAFONE, ETISALAT, ORANGE, WE
+      if (!CONFIG.paymob.walletIntegrationId) {
+        return res.status(400).json({
+          success: false, provider: 'paymob',
+          message: 'PAYMOB_WALLET_INTEGRATION_ID غير مضبوط في إعدادات الخادم. أضف معرف تكامل المحفظة من Paymob Dashboard واستمر.'
+        });
+      }
       const subtype = walletSubtypes[paymentMethod] || 'VODAFONE';
       const phone = req.body.phone || '01000000000';
       const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
@@ -433,7 +438,6 @@ app.post('/api/create-paymob-intent', async (req, res) => {
         if (walletData.redirect_url) {
           res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
         } else {
-          // Paymob أرسل OTP — نطلب من المستخدم إدخال الرمز
           res.json({
             success: true, method: paymentMethod, otp_required: true,
             orderId: order.id, paymobId: walletData.id,
@@ -442,7 +446,7 @@ app.post('/api/create-paymob-intent', async (req, res) => {
           });
         }
       } else {
-        throw new Error(JSON.stringify(walletData));
+        return res.status(400).json({ success: false, provider: 'paymob', message: walletData.data?.message || JSON.stringify(walletData) });
       }
     } else {
       // Card / other — iframe
