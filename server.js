@@ -415,38 +415,39 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
 
     if (isWallet) {
-      if (!CONFIG.paymob.walletIntegrationId) {
-        return res.status(400).json({
-          success: false, provider: 'paymob',
-          message: 'PAYMOB_WALLET_INTEGRATION_ID غير مضبوط في إعدادات الخادم. أضف معرف تكامل المحفظة من Paymob Dashboard واستمر.'
+      if (CONFIG.paymob.walletIntegrationId) {
+        // Wallet Integration ID موجود → استخدم API المحفظة المباشر
+        const subtype = walletSubtypes[paymentMethod] || 'VODAFONE';
+        const phone = req.body.phone || '01000000000';
+        const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: { identifier: phone, subtype },
+            payment_token: paymentKey.token
+          })
         });
-      }
-      const subtype = walletSubtypes[paymentMethod] || 'VODAFONE';
-      const phone = req.body.phone || '01000000000';
-      const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source: { identifier: phone, subtype },
-          payment_token: paymentKey.token
-        })
-      });
-      const walletData = await walletRes.json();
-      console.log('📨 Paymob wallet response:', JSON.stringify(walletData));
+        const walletData = await walletRes.json();
+        console.log('📨 Paymob wallet response:', JSON.stringify(walletData));
 
-      if (walletData.pending) {
-        if (walletData.redirect_url) {
-          res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
+        if (walletData.pending) {
+          if (walletData.redirect_url) {
+            res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
+          } else {
+            res.json({
+              success: true, method: paymentMethod, otp_required: true,
+              orderId: order.id, paymobId: walletData.id,
+              payment_token: paymentKey.token, phone, subtype,
+              message: 'تم إرسال رمز التأكيد إلى هاتفك. أدخل الرمز لإتمام الدفع.'
+            });
+          }
         } else {
-          res.json({
-            success: true, method: paymentMethod, otp_required: true,
-            orderId: order.id, paymobId: walletData.id,
-            payment_token: paymentKey.token, phone, subtype,
-            message: 'تم إرسال رمز التأكيد إلى هاتفك. أدخل الرمز لإتمام الدفع.'
-          });
+          return res.status(400).json({ success: false, provider: 'paymob', message: walletData.data?.message || JSON.stringify(walletData) });
         }
       } else {
-        return res.status(400).json({ success: false, provider: 'paymob', message: walletData.data?.message || JSON.stringify(walletData) });
+        // Wallet Integration ID غير مضبوط → نستخدم iframe البطاقات (احتياطي)
+        const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${CONFIG.paymob.iframeId}?payment_token=${paymentKey.token}`;
+        res.json({ success: true, method: paymentMethod, redirect: true, url: iframeUrl, orderId: order.id });
       }
     } else {
       // Card / other — iframe
