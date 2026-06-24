@@ -395,6 +395,8 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     const intentId = isWallet && CONFIG.paymob.walletIntegrationId
       ? CONFIG.paymob.walletIntegrationId
       : CONFIG.paymob.integrationId;
+    // Paymob subtypes: VODAFONE, ETISALAT, ORANGE, WE (بدون _CASH)
+    const walletSubtypes = { vodafone_cash: 'VODAFONE', etisalat_cash: 'ETISALAT' };
 
     const pkRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payment_keys`, {
       method: 'POST',
@@ -413,7 +415,8 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
 
     if (isWallet) {
-      const subtype = paymentMethod === 'vodafone_cash' ? 'VODAFONE_CASH' : 'ETISALAT_CASH';
+      // Paymob subtypes: VODAFONE, ETISALAT, ORANGE, WE
+      const subtype = walletSubtypes[paymentMethod] || 'VODAFONE';
       const phone = req.body.phone || '01000000000';
       const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
         method: 'POST',
