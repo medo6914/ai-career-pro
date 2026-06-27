@@ -8,9 +8,13 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 
-// Save raw body for webhooks (must run before express.json)
+// Save raw body for webhooks
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/webhook/')) {
+    if (process.env.VERCEL) {
+      req.rawBody = Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
+      return next();
+    }
     let data = [];
     req.on('data', chunk => data.push(chunk));
     req.on('end', () => {
@@ -861,10 +865,12 @@ function shutdown(signal) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log('');
-  console.log('║       AI Career Pro - v1.0.0             ║');
+if (require.main === module || !process.env.VERCEL) {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => {
+    console.log('');
+    console.log('╔══════════════════════════════════════════╗');
+    console.log('║       AI Career Pro - v1.0.0             ║');
   console.log('╠══════════════════════════════════════════╣');
   console.log(`║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(29)}║`);
   console.log(`║  Port:        ${String(PORT).padEnd(29)}║`);
@@ -891,4 +897,7 @@ server.listen(PORT, () => {
   console.log('║    Paymob   : POST /api/webhook/paymob    ║');
   console.log('╚══════════════════════════════════════════╝');
   console.log('');
-});
+  });
+}
+
+module.exports = app;
