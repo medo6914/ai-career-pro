@@ -180,7 +180,7 @@ app.post('/api/create-checkout', async (req, res) => {
       line_items: lineItems,
       mode: 'subscription',
       subscription_data: { metadata: { tier: p.tier, clientId: clientId || req.ip } },
-      success_url: `${req.headers.origin || 'http://localhost:3000'}/?success=true&tier=${p.tier}`,
+      success_url: `${req.headers.origin || 'http://localhost:3000'}/?success=true&tier=${p.tier}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.origin || 'http://localhost:3000'}/?canceled=true`,
       client_reference_id: clientId || req.ip,
       metadata: { tier: p.tier, clientId: clientId || req.ip }
@@ -392,7 +392,9 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     };
 
     const isWallet = paymentMethod === 'vodafone_cash' || paymentMethod === 'etisalat_cash';
-    const intentId = isWallet && CONFIG.paymob.walletIntegrationId
+    const walletIntegrationValid = isWallet && CONFIG.paymob.walletIntegrationId;
+    console.log(`💳 Paymob: isWallet=${isWallet}, walletIntegrationId="${CONFIG.paymob.walletIntegrationId}", walletIntegrationValid=${!!walletIntegrationValid}`);
+    const intentId = walletIntegrationValid
       ? CONFIG.paymob.walletIntegrationId
       : CONFIG.paymob.integrationId;
     // Paymob subtypes: VODAFONE, ETISALAT, ORANGE, WE (بدون _CASH)
@@ -403,7 +405,7 @@ app.post('/api/create-paymob-intent', async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         auth_token: token, amount_cents: amount, expiration: 3600, order_id: order.id,
-        billing_data: billingData, currency: 'EGP', integration_id: intentId, lock_order_when_paid: 'true'
+        billing_data: billingData, currency: 'EGP', integration_id: Number(intentId), lock_order_when_paid: 'true'
       })
     });
     const paymentKey = await pkRes.json();
@@ -414,11 +416,15 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     u.pendingOrderId = order.id;
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
 
+    function paymobSuccess(d) { return d.success === true || d.success === 'true' || d.success === 1; }
+
     if (isWallet) {
       if (CONFIG.paymob.walletIntegrationId) {
-        // Wallet Integration ID موجود → استخدم API المحفظة المباشر
         const subtype = walletSubtypes[paymentMethod] || 'VODAFONE';
-        const phone = req.body.phone || '01000000000';
+        let phone = req.body.phone || '01000000000';
+        phone = phone.replace(/[^0-9]/g, '').replace(/^(\+?2)?/, '').slice(-11);
+        if (phone.length < 11) phone = '01000000000';
+        console.log(`📞 Paymob wallet phone: ${phone} (original: ${req.body.phone})`);
         const walletRes = await fetch(`${PAYMOB_API_BASE}/acceptance/payments/pay`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -430,29 +436,33 @@ app.post('/api/create-paymob-intent', async (req, res) => {
         const walletData = await walletRes.json();
         console.log('📨 Paymob wallet response:', JSON.stringify(walletData));
 
+        if (paymobSuccess(walletData)) {
+          upgradeUser(clientId || req.ip, tier);
+          return res.json({ success: true, method: paymentMethod, message: '✅ تم الدفع والترقية بنجاح!' });
+        }
+
         if (walletData.pending) {
           if (walletData.redirect_url) {
-            res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
-          } else {
-            res.json({
-              success: true, method: paymentMethod, otp_required: true,
-              orderId: order.id, paymobId: walletData.id,
-              payment_token: paymentKey.token, phone, subtype,
-              message: 'تم إرسال رمز التأكيد إلى هاتفك. أدخل الرمز لإتمام الدفع.'
-            });
+            return res.json({ success: true, method: paymentMethod, redirect: true, url: walletData.redirect_url, orderId: order.id });
           }
-        } else {
-          return res.status(400).json({ success: false, provider: 'paymob', message: walletData.data?.message || JSON.stringify(walletData) });
+          return res.json({
+            success: true, method: paymentMethod, otp_required: true,
+            orderId: order.id, paymobId: walletData.id,
+            payment_token: paymentKey.token, phone, subtype,
+            message: 'تم إرسال رمز التأكيد إلى هاتفك. أدخل الرمز لإتمام الدفع.'
+          });
         }
+
+        console.log('❌ Paymob wallet failed:', JSON.stringify(walletData));
+        return res.status(400).json({ success: false, provider: 'paymob', message: walletData.data?.message || JSON.stringify(walletData) });
       } else {
-        // Wallet Integration ID غير مضبوط → نستخدم iframe البطاقات (احتياطي)
+        console.warn(`⚠️ Paymob walletIntegrationId NOT set! Using card iframe fallback. Set PAYMOB_WALLET_INTEGRATION_ID in .env`);
         const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${CONFIG.paymob.iframeId}?payment_token=${paymentKey.token}`;
-        res.json({ success: true, method: paymentMethod, redirect: true, url: iframeUrl, orderId: order.id });
+        return res.json({ success: true, method: paymentMethod, redirect: true, url: iframeUrl, orderId: order.id });
       }
     } else {
-      // Card / other — iframe
       const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${CONFIG.paymob.iframeId}?payment_token=${paymentKey.token}`;
-      res.json({ success: true, method: 'card', redirect: true, url: iframeUrl, orderId: order.id });
+      return res.json({ success: true, method: 'card', redirect: true, url: iframeUrl, orderId: order.id });
     }
   } catch (error) {
     console.error('❌ Paymob Error:', error.message);
@@ -477,7 +487,7 @@ app.post('/api/webhook/paymob', (req, res) => {
       }
     }
 
-    if (data.type === 'TRANSACTION' && data.obj?.success === true) {
+    if (data.type === 'TRANSACTION' && paymobSuccess(data.obj)) {
       const orderId = data.obj.order?.id;
       if (orderId && pendingOrders.has(orderId)) {
         const { clientId, tier } = pendingOrders.get(orderId);
@@ -510,7 +520,7 @@ app.post('/api/webhook/paymob', (req, res) => {
 // Paymob OTP confirmation — المستخدم أدخل الرمز ونرسله لـ Paymob
 app.post('/api/paymob/confirm-otp', async (req, res) => {
   try {
-    const { otp, payment_token, phone, subtype, clientId, tier } = req.body;
+    const { otp, payment_token, phone, subtype, clientId, tier, paymobId } = req.body;
     if (!otp || !payment_token || !phone || !subtype) {
       return res.status(400).json({ success: false, message: 'Missing OTP fields' });
     }
@@ -526,17 +536,44 @@ app.post('/api/paymob/confirm-otp', async (req, res) => {
     const confirmData = await confirmRes.json();
     console.log('📨 Paymob OTP confirm:', JSON.stringify(confirmData));
 
-    if (confirmData.success === true) {
+    if (paymobSuccess(confirmData)) {
       upgradeUser(clientId || req.ip, tier || 'pro');
-      res.json({ success: true, message: '✅ تم تأكيد الدفع والترقية بنجاح!' });
-    } else if (confirmData.pending && confirmData.redirect_url) {
-      res.json({ success: true, method: 'wallet', redirect: true, url: confirmData.redirect_url });
-    } else {
-      res.json({ success: false, message: confirmData.data?.message || 'رمز التأكيد غير صحيح. حاول مرة أخرى.' });
+      return res.json({ success: true, message: '✅ تم تأكيد الدفع والترقية بنجاح!' });
     }
+    if (confirmData.pending && confirmData.redirect_url) {
+      return res.json({ success: true, method: 'wallet', redirect: true, url: confirmData.redirect_url });
+    }
+    return res.json({ success: false, message: confirmData.data?.message || 'رمز التأكيد غير صحيح. حاول مرة أخرى.' });
   } catch (error) {
     console.error('❌ Paymob OTP Error:', error.message);
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// PayPal webhook
+app.post('/api/webhook/paypal', (req, res) => {
+  try {
+    const data = req.body;
+    console.log('📨 PayPal webhook event:', data.event_type);
+
+    if (data.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      const resource = data.resource;
+      const customId = resource?.purchase_units?.[0]?.custom_id || '';
+      const [clientId, tier] = customId.split(':');
+      if (clientId) upgradeUser(clientId, tier || 'pro');
+    }
+
+    if (data.event_type === 'BILLING.SUBSCRIPTION.CREATED' || data.event_type === 'BILLING.SUBSCRIPTION.ACTIVATED') {
+      const resource = data.resource;
+      const customId = resource?.custom_id || '';
+      const [clientId, tier] = customId.split(':');
+      if (clientId) upgradeUser(clientId, tier || 'pro');
+    }
+
+    res.json({ received: true });
+  } catch (e) {
+    console.error('❌ PayPal webhook error:', e.message);
+    res.status(400).json({ error: e.message });
   }
 });
 
@@ -740,6 +777,7 @@ app.get('/health', (req, res) => {
     stripe: !!stripe,
     paypal: paypalReady,
     paymob: paymobReady,
+    paymob_wallet: isKeyValid(CONFIG.paymob.walletIntegrationId),
     gemini: isKeyValid(CONFIG.ai.gemini),
     openai: isKeyValid(CONFIG.ai.openai),
     openrouter: isKeyValid(CONFIG.ai.openrouter)
@@ -756,6 +794,7 @@ app.get('/api/health', (req, res) => {
     stripe: !!stripe,
     paypal: paypalReady,
     paymob: paymobReady,
+    paymob_wallet: isKeyValid(CONFIG.paymob.walletIntegrationId),
     gemini: isKeyValid(CONFIG.ai.gemini),
     openai: isKeyValid(CONFIG.ai.openai),
     openrouter: isKeyValid(CONFIG.ai.openrouter)
@@ -768,6 +807,7 @@ app.get('/api/debug/config', (req, res) => {
     stripe: !!stripe,
     paypal: paypalReady,
     paymob: paymobReady,
+    paymob_wallet: isKeyValid(CONFIG.paymob.walletIntegrationId),
     gemini: isKeyValid(CONFIG.ai.gemini),
     openai: isKeyValid(CONFIG.ai.openai),
     openrouter: isKeyValid(CONFIG.ai.openrouter),
@@ -800,10 +840,30 @@ app.use((err, req, res, next) => {
 //  STARTUP
 // ═════════════════════════════════════════════
 
+// ═════════════════════════════════════════════
+//  GRACEFUL SHUTDOWN
+// ═════════════════════════════════════════════
+
+const server = require('http').createServer(app);
+
+function shutdown(signal) {
+  console.log(`\n📥 ${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log('✅ Server closed.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error('❌ Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log('');
-  console.log('╔══════════════════════════════════════════╗');
   console.log('║       AI Career Pro - v1.0.0             ║');
   console.log('╠══════════════════════════════════════════╣');
   console.log(`║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(29)}║`);
@@ -821,6 +881,7 @@ app.listen(PORT, () => {
   if (CONFIG.stripe.vipPriceId) console.log(`║    VIP Price : ${CONFIG.stripe.vipPriceId.padEnd(30)}║`);
   console.log(`║    PayPal    : ${paypalReady ? '✅'.padEnd(31) : '❌'.padEnd(31)}║`);
   console.log(`║    Paymob    : ${paymobReady ? '✅'.padEnd(31) : '❌'.padEnd(31)}║`);
+  console.log(`║    Paymob Wallet : ${isKeyValid(CONFIG.paymob.walletIntegrationId) ? '✅'.padEnd(26) : '❌'.padEnd(26)}║`);
   console.log('╠══════════════════════════════════════════╣');
   console.log('║  ENDPOINTS                                ║');
   console.log('║    Health   : GET /api/health             ║');

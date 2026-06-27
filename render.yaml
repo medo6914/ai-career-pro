@@ -24,14 +24,16 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-      - key: STRIPE_PRO_PRICE_ID
+      - key: STRIPE_PRO_MONTHLY_PRICE_ID
         sync: false
-      - key: STRIPE_VIP_PRICE_ID
+      - key: STRIPE_VIP_MONTHLY_PRICE_ID
         sync: false
       # Paymob (Vodafone Cash, Etisalat Cash)
       - key: PAYMOB_API_KEY
         sync: false
       - key: PAYMOB_INTEGRATION_ID
+        sync: false
+      - key: PAYMOB_WALLET_INTEGRATION_ID
         sync: false
       - key: PAYMOB_IFRAME_ID
         sync: false
