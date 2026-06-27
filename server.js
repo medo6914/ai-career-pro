@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const crypto = require('crypto');
 const OpenAI = require('openai');
@@ -585,7 +586,7 @@ app.post('/api/webhook/paypal', (req, res) => {
 //  GLOBAL MIDDLEWARE
 // ═════════════════════════════════════════════
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ═════════════════════════════════════════════
 //  AI PROVIDERS
