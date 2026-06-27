@@ -349,6 +349,8 @@ app.post('/api/capture-paypal-order', async (req, res) => {
 const PAYMOB_API_BASE = 'https://accept.paymob.com/api';
 const paymobReady = isKeyValid(CONFIG.paymob.apiKey) && isKeyValid(CONFIG.paymob.integrationId);
 
+function paymobSuccess(d) { return d && (d.success === true || d.success === 'true' || d.success === 1); }
+
 let paymobToken = null;
 let paymobTokenExpiry = 0;
 
@@ -420,8 +422,6 @@ app.post('/api/create-paymob-intent', async (req, res) => {
     u.pendingTier = tier;
     u.pendingOrderId = order.id;
     pendingOrders.set(order.id, { clientId: clientId || req.ip, tier });
-
-    function paymobSuccess(d) { return d.success === true || d.success === 'true' || d.success === 1; }
 
     if (isWallet) {
       if (CONFIG.paymob.walletIntegrationId) {

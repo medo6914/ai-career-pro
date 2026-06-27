@@ -360,11 +360,12 @@ async function handleWallet(tier, method) {
       } else {
         alert(confirmData.message || '❌ فشل التأكيد. حاول مرة أخرى.');
       }
-    } else if (data.redirect && data.url) {
-      window.location.href = data.url;
+    } else {
+      // لا يوجد OTP ولا redirect — عرض رسالة الخطأ من السيرفر
+      alert(data.message || i18n[currentLang]['wallet_error']);
     }
   } catch (err) {
-    alert(i18n[currentLang]['wallet_error']);
+    alert(i18n[currentLang]['wallet_error'] + '\n' + (err.message || ''));
   }
 }
 
