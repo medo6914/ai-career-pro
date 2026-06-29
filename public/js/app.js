@@ -84,6 +84,8 @@ const i18n = {
     pay_paypal: '🅿️ PayPal',
     pay_vodafone: '📱 Vodafone Cash',
     pay_etisalat: '📱 Etisalat Cash',
+    pay_orange: '📱 Orange Cash',
+    pay_we: '📱 WE Pay',
     pay_with: 'ادفع بـ',
     phone_required: 'رقم الهاتف مطلوب للدفع عبر المحفظة',
     enter_phone: 'أدخل رقم هاتفك للدفع',
@@ -175,6 +177,8 @@ const i18n = {
     pay_paypal: '🅿️ PayPal',
     pay_vodafone: '📱 Vodafone Cash',
     pay_etisalat: '📱 Etisalat Cash',
+    pay_orange: '📱 Orange Cash',
+    pay_we: '📱 WE Pay',
     pay_with: 'Pay with',
     phone_required: 'Phone number required for wallet payment',
     enter_phone: 'Enter your phone number',
@@ -290,7 +294,7 @@ document.querySelectorAll('.pay-method-btn').forEach(btn => {
 async function handlePayment(tier, method) {
   if (method === 'stripe') await handleStripe(tier);
   else if (method === 'paypal') await handlePayPal(tier);
-  else if (method === 'vodafone_cash' || method === 'etisalat_cash') await handleWallet(tier, method);
+  else if (method === 'vodafone_cash' || method === 'etisalat_cash' || method === 'orange_cash' || method === 'we_pay') await handleKashierWallet(tier, method);
 }
 
 async function handleStripe(tier) {
@@ -366,6 +370,24 @@ async function handleWallet(tier, method) {
     }
   } catch (err) {
     alert(i18n[currentLang]['wallet_error'] + '\n' + (err.message || ''));
+  }
+}
+
+async function handleKashierWallet(tier, method) {
+  try {
+    const res = await fetch('/api/kashier/create-payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier, clientId, paymentMethod: method })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'فشل الدفع');
+    if (data.redirect && data.url) {
+      window.location.href = data.url;
+    } else {
+      alert(data.message || '❌ فشل الدفع عبر المحفظة');
+    }
+  } catch (err) {
+    alert(err.message || '❌ فشل الدفع عبر المحفظة');
   }
 }
 

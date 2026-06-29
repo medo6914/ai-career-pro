@@ -70,6 +70,11 @@ const CONFIG = {
     iframeId: cleanKey(process.env.PAYMOB_IFRAME_ID),
     hmac: cleanKey(process.env.PAYMOB_HMAC)
   },
+  kashier: {
+    accountId: cleanKey(process.env.KASHIER_ACCOUNT_ID),
+    apiSecret: cleanKey(process.env.KASHIER_API_SECRET),
+    mode: process.env.KASHIER_MODE === 'live' ? 'live' : 'sandbox'
+  },
   ai: {
     gemini: cleanKey(process.env.GEMINI_API_KEY),
     openai: cleanKey(process.env.OPENAI_API_KEY),
@@ -583,6 +588,94 @@ app.post('/api/webhook/paypal', (req, res) => {
 });
 
 // ═════════════════════════════════════════════
+//  KASHIER (Vodafone Cash, Etisalat Cash, Orange Cash, WE Pay)
+// ═════════════════════════════════════════════
+
+const kashierReady = isKeyValid(CONFIG.kashier.accountId) && isKeyValid(CONFIG.kashier.apiSecret);
+const KASHIER_BASE = 'https://checkout.kashier.io';
+
+function generateKashierHash(merchantId, orderId, amount, currency) {
+  const data = `${merchantId}.${orderId}.${amount}.${currency}`;
+  return crypto.createHmac('sha256', CONFIG.kashier.apiSecret).update(data).digest('hex');
+}
+
+const pendingKashierOrders = new Map();
+
+// Kashier test endpoint
+app.get('/api/kashier/test', (req, res) => {
+  res.json({ success: kashierReady, provider: 'kashier', message: kashierReady ? '✅ Kashier جاهز' : '❌ تأكد من KASHIER_ACCOUNT_ID و KASHIER_API_SECRET' });
+});
+
+// Create Kashier payment for wallet
+app.post('/api/kashier/create-payment', async (req, res) => {
+  try {
+    if (!kashierReady) return res.status(503).json({ success: false, provider: 'kashier', message: 'Kashier غير مهيأ. أضف KASHIER_ACCOUNT_ID و KASHIER_API_SECRET في .env' });
+
+    const { tier, clientId, paymentMethod } = req.body;
+    const amounts = { pro: 9.99, vip: 19.99 };
+    const amount = amounts[tier];
+    if (!amount) return res.status(400).json({ success: false, message: 'Invalid tier' });
+
+    const orderId = `KC_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const currency = 'EGP';
+    const hash = generateKashierHash(CONFIG.kashier.accountId, orderId, amount, currency);
+    const origin = req.headers.origin || 'https://ai-career-pro.vercel.app';
+
+    pendingKashierOrders.set(orderId, { clientId: clientId || req.ip, tier, paymentMethod });
+
+    const params = new URLSearchParams({
+      merchantId: CONFIG.kashier.accountId,
+      orderId,
+      amount: amount.toString(),
+      currency,
+      hash,
+      merchantRedirect: `${origin}/api/kashier/return`,
+      display: 'ar',
+      metaData: JSON.stringify({ clientId: clientId || '', tier }),
+      paymentMethod: 'wallet'
+    });
+
+    const paymentUrl = `${KASHIER_BASE}?${params.toString()}`;
+    console.log(`💳 Kashier payment created: ${orderId} - ${tier} - ${paymentMethod}`);
+    res.json({ success: true, redirect: true, url: paymentUrl, orderId });
+  } catch (error) {
+    console.error('❌ Kashier Error:', error.message);
+    res.status(500).json({ success: false, provider: 'kashier', message: error.message });
+  }
+});
+
+// Kashier return (user redirected here after payment)
+app.get('/api/kashier/return', (req, res) => {
+  const { orderId, success, paymentMethod } = req.query;
+  if (success === 'true' && orderId && pendingKashierOrders.has(orderId)) {
+    const { clientId, tier } = pendingKashierOrders.get(orderId);
+    upgradeUser(clientId, tier);
+    pendingKashierOrders.delete(orderId);
+  }
+  res.redirect(`/?success=${success === 'true'}&provider=kashier&tier=${req.query.tier || 'pro'}`);
+});
+
+// Kashier webhook
+app.post('/api/webhook/kashier', (req, res) => {
+  try {
+    const data = req.body;
+    console.log('📨 Kashier webhook:', JSON.stringify(data));
+    if (data.event === 'payment.success' && data.order?.reference) {
+      const orderId = data.order.reference;
+      if (orderId && pendingKashierOrders.has(orderId)) {
+        const { clientId, tier } = pendingKashierOrders.get(orderId);
+        upgradeUser(clientId, tier);
+        pendingKashierOrders.delete(orderId);
+      }
+    }
+    res.json({ received: true });
+  } catch (e) {
+    console.error('❌ Kashier webhook error:', e.message);
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// ═════════════════════════════════════════════
 //  GLOBAL MIDDLEWARE
 // ═════════════════════════════════════════════
 
@@ -783,6 +876,7 @@ app.get('/health', (req, res) => {
     paypal: paypalReady,
     paymob: paymobReady,
     paymob_wallet: isKeyValid(CONFIG.paymob.walletIntegrationId),
+    kashier: kashierReady,
     gemini: isKeyValid(CONFIG.ai.gemini),
     openai: isKeyValid(CONFIG.ai.openai),
     openrouter: isKeyValid(CONFIG.ai.openrouter)
@@ -800,6 +894,7 @@ app.get('/api/health', (req, res) => {
     paypal: paypalReady,
     paymob: paymobReady,
     paymob_wallet: isKeyValid(CONFIG.paymob.walletIntegrationId),
+    kashier: kashierReady,
     gemini: isKeyValid(CONFIG.ai.gemini),
     openai: isKeyValid(CONFIG.ai.openai),
     openrouter: isKeyValid(CONFIG.ai.openrouter)
@@ -813,6 +908,7 @@ app.get('/api/debug/config', (req, res) => {
     paypal: paypalReady,
     paymob: paymobReady,
     paymob_wallet: isKeyValid(CONFIG.paymob.walletIntegrationId),
+    kashier: kashierReady,
     gemini: isKeyValid(CONFIG.ai.gemini),
     openai: isKeyValid(CONFIG.ai.openai),
     openrouter: isKeyValid(CONFIG.ai.openrouter),
@@ -888,15 +984,17 @@ if (require.main === module || !process.env.VERCEL) {
   if (CONFIG.stripe.vipPriceId) console.log(`║    VIP Price : ${CONFIG.stripe.vipPriceId.padEnd(30)}║`);
   console.log(`║    PayPal    : ${paypalReady ? '✅'.padEnd(31) : '❌'.padEnd(31)}║`);
   console.log(`║    Paymob    : ${paymobReady ? '✅'.padEnd(31) : '❌'.padEnd(31)}║`);
-  console.log(`║    Paymob Wallet : ${isKeyValid(CONFIG.paymob.walletIntegrationId) ? '✅'.padEnd(26) : '❌'.padEnd(26)}║`);
-  console.log('╠══════════════════════════════════════════╣');
-  console.log('║  ENDPOINTS                                ║');
+    console.log(`║    Paymob Wallet : ${isKeyValid(CONFIG.paymob.walletIntegrationId) ? '✅'.padEnd(26) : '❌'.padEnd(26)}║`);
+    console.log(`║    Kashier    : ${kashierReady ? '✅'.padEnd(31) : '❌'.padEnd(31)}║`);
+    console.log('╠══════════════════════════════════════════╣');
+    console.log('║  ENDPOINTS                                ║');
   console.log('║    Health   : GET /api/health             ║');
   console.log('║    Debug    : GET /api/debug/config       ║');
   console.log('║    PayPal   : GET /api/paypal/test        ║');
   console.log('║    Stripe   : POST /api/webhook/stripe    ║');
-  console.log('║    Paymob   : POST /api/webhook/paymob    ║');
-  console.log('╚══════════════════════════════════════════╝');
+    console.log('║    Paymob   : POST /api/webhook/paymob    ║');
+    console.log('║    Kashier  : POST /api/kashier/create-payment║');
+    console.log('╚══════════════════════════════════════════╝');
   console.log('');
   });
 }

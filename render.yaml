@@ -39,6 +39,13 @@ services:
         sync: false
       - key: PAYMOB_HMAC
         sync: false
+      # Kashier (Vodafone Cash, Etisalat Cash, Orange Cash, WE Pay)
+      - key: KASHIER_ACCOUNT_ID
+        sync: false
+      - key: KASHIER_API_SECRET
+        sync: false
+      - key: KASHIER_MODE
+        value: sandbox
       # PayPal
       - key: PAYPAL_CLIENT_ID
         sync: false
